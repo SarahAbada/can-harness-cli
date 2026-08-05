@@ -1,6 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, List
-# imports
+from typing import Optional
 
 DELIMITER = ":"
 TERMINATOR = "\n" 
@@ -32,15 +31,6 @@ class HarnessCommand:
     target: Optional[str] = None # can hold a str or be None
     parameter: Optional[str] = None # can hold a str or be None
     # no init function, dataclass manages that by itself
-    def __post_init__(self):
-        """
-        Runs automatically after __init__ to validate fields.
-        """
-        # ensure target is valid if it is provided
-        if self.target is not None:
-            valid_targets = VALID_BUSES.union(VALID_MODULES) # combine both sets into one master set of destinations
-            if self.target not in valid_targets:
-                raise ValueError(f"Invalid target '{self.target}'. Must be one of {valid_targets}")
     def validate(self, destination: str) -> bool:
         """
         Validates the command against the protocol rules for either 'head' or 'hub'.
@@ -101,3 +91,42 @@ class HarnessCommand:
             
         # Join components with ':' and append '\n'
         return DELIMITER.join(components) + TERMINATOR
+
+
+def _normalize_part(part: str) -> Optional[str]:
+    cleaned = part.strip()
+    return cleaned if cleaned else None
+
+
+def _looks_like_parameter(action: str, value: str) -> bool:
+    for ruleset in (HEAD_RULES, HUB_RULES):
+        rule = ruleset.get(action)
+        if not rule:
+            continue
+        if rule["targets"] == {None} and value in rule["parameters"]:
+            return True
+    return False
+
+def parse_raw_command(raw_input: str) -> HarnessCommand:
+    """parses a raw user input string from the cli interface into a HarnessCommand type object that can be sent over serial connection"""
+    cleaned = raw_input.strip()
+    if not cleaned:
+        raise ValueError("command cannot be empty")
+
+    # split into a maximum of three components
+    parts = cleaned.split(":", 2)
+
+    # make each part into a HarnessCommand attribute and return the object
+    action = parts[0].strip()
+    target = _normalize_part(parts[1]) if len(parts) > 1 else None
+    parameter = _normalize_part(parts[2]) if len(parts) > 2 else None
+
+    if len(parts) == 2 and target is not None and _looks_like_parameter(action, target):
+        parameter = target
+        target = None
+
+    if len(parts) == 1:
+        target = None
+        parameter = None
+
+    return HarnessCommand(action = action, target=target, parameter=parameter)
