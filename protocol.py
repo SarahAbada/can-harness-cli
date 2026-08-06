@@ -21,7 +21,7 @@ HEAD_RULES = {
 HUB_RULES = {
     "ping": {"targets": {None}, "parameters": {None}},
     "send": {"targets": {"fdcan", "tcan", "afea", "afeb"}, "parameters": "hex"},
-    "sniff": {"targets": {None}, "parameters": {"on", "off"}},  # sniff:<on/off> has no bus target
+    "sniff": {"targets": {"hub"}, "parameters": {"on", "off"}},  # hub sniff uses the short form sniff:<on/off>
     "reset": {"targets": {None}, "parameters": {None}},
 }
 
@@ -120,6 +120,10 @@ def parse_raw_command(raw_input: str) -> HarnessCommand:
     action = parts[0].strip()
     target = _normalize_part(parts[1]) if len(parts) > 1 else None
     parameter = _normalize_part(parts[2]) if len(parts) > 2 else None
+
+    if action == "sniff" and len(parts) == 2 and target in {"on", "off"}:
+        parameter = target
+        target = "hub"
 
     if len(parts) == 2 and target is not None and _looks_like_parameter(action, target):
         parameter = target
